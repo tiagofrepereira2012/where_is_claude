@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "where-is-claude"
+dynamic = ["version"]
+description = "Find which GNU screen sessions are running Claude Code."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+authors = [{ name = "Tiago Pereira" }]
+keywords = ["claude", "claude-code", "screen", "terminal", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Utilities",
+]
+dependencies = []
+
+[project.scripts]
+where-is-claude = "where_is_claude.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=7",
+    "ruff>=0.16.9",
+    "ty>=0.0.84",
+]
+
+[tool.hatch.version]
+path = "src/where_is_claude/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/where_is_claude"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific rules
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]
+
+[tool.ty.environment]
+python-version = "3.9"
+
+[tool.ty.src]
+include = ["src", "tests"]
