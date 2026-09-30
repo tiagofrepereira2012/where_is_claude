@@ -98,3 +98,38 @@ def test_read_claude_session_info(tmp_path):
     assert read_claude_session_info(5000, str(tmp_path)) == {}
     assert read_claude_session_info(6000, str(tmp_path)) == {}
     assert read_claude_session_info(7000, str(tmp_path)) == {}
+
+
+def test_read_custom_title_uses_latest(tmp_path):
+    from where_is_claude.core import find_transcript, read_custom_title
+
+    project = tmp_path / "projects" / "-Users-me-api"
+    project.mkdir(parents=True)
+    transcript = project / "abc-123.jsonl"
+    transcript.write_text(
+        '{"type":"user","message":"say \\"custom-title\\""}\n'
+        '{"type":"custom-title","customTitle":"First name","sessionId":"abc-123"}\n'
+        "broken line\n"
+        '{"type":"custom-title","customTitle":"Fix login bug","sessionId":"abc-123"}\n'
+    )
+    found = find_transcript("abc-123", str(tmp_path))
+    assert found == str(transcript)
+    assert read_custom_title(found) == "Fix login bug"
+    assert find_transcript("missing", str(tmp_path)) is None
+
+
+def test_read_custom_title_none_when_untitled(tmp_path):
+    from where_is_claude.core import read_custom_title
+
+    transcript = tmp_path / "x.jsonl"
+    transcript.write_text('{"type":"user","message":"hi"}\n')
+    assert read_custom_title(str(transcript)) is None
+
+
+def test_resume_name_falls_back_to_session_id():
+    session = ScreenSession(pid=1, name="api", state="Detached")
+    titled = ClaudeInScreen(session, 2, "claude", claude_session_name="Fix", claude_session_id="u")
+    untitled = ClaudeInScreen(session, 2, "claude", claude_session_id="uuid-1")
+    assert titled.resume_name == "Fix"
+    assert untitled.resume_name == "uuid-1"
+    assert ClaudeInScreen(session, 2, "claude").resume_name is None

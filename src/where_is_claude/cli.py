@@ -29,7 +29,7 @@ def _render_table(results: list[ClaudeInScreen]) -> str:
             r.session.state,
             r.window if r.window is not None else "?",
             str(r.pid),
-            r.claude_session_name or "-",
+            r.resume_name or "-",
             _shorten_home(r.cwd),
         ]
         for r in results

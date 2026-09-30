@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import glob
 import json
 import os
 import re
@@ -49,6 +50,11 @@ class ClaudeInScreen:
     claude_session_id: str | None = None
 
     @property
+    def resume_name(self) -> str | None:
+        """What to pass to `claude --resume`: the session title, else its id."""
+        return self.claude_session_name or self.claude_session_id
+
+    @property
     def attach_command(self) -> str:
         # -d -r detaches it elsewhere first, so it works for attached sessions too.
         cmd = f"screen -d -r {self.session.id}"
@@ -68,6 +74,7 @@ class ClaudeInScreen:
             "cwd": self.cwd,
             "claude_session_name": self.claude_session_name,
             "claude_session_id": self.claude_session_id,
+            "resume": self.resume_name,
             "attach": self.attach_command,
         }
 
@@ -243,6 +250,37 @@ def read_claude_session_info(pid: int, config_dir: str | None = None) -> dict:
     return data if isinstance(data, dict) and data.get("pid") in (None, pid) else {}
 
 
+def find_transcript(session_id: str, config_dir: str | None = None) -> str | None:
+    """Return the path of a session's transcript, `<config>/projects/*/<id>.jsonl`."""
+    root = glob.escape(config_dir or claude_config_dir())
+    pattern = os.path.join(root, "projects", "*", f"{glob.escape(session_id)}.jsonl")
+    matches = glob.glob(pattern)
+    return max(matches, key=os.path.getmtime) if matches else None
+
+
+def read_custom_title(transcript: str) -> str | None:
+    """Return the latest title set with `/rename` or `claude -n` in a transcript.
+
+    This is the name `claude --resume <name>` matches on.
+    """
+    title = None
+    try:
+        with open(transcript, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                if '"custom-title"' not in line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(entry, dict) and entry.get("type") == "custom-title":
+                    value = entry.get("customTitle")
+                    title = value.strip() if isinstance(value, str) and value.strip() else None
+    except OSError:
+        return None
+    return title
+
+
 def _str_or_none(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
 
@@ -258,6 +296,9 @@ def find_claude_sessions() -> list[ClaudeInScreen]:
     results = []
     for session, proc in pairs:
         info = read_claude_session_info(proc.pid)
+        session_id = _str_or_none(info.get("sessionId"))
+        transcript = find_transcript(session_id) if session_id else None
+        title = read_custom_title(transcript) if transcript else None
         results.append(
             ClaudeInScreen(
                 session=session,
@@ -265,8 +306,8 @@ def find_claude_sessions() -> list[ClaudeInScreen]:
                 args=proc.args,
                 window=_window_for(proc.pid),
                 cwd=cwds.get(proc.pid) or _str_or_none(info.get("cwd")),
-                claude_session_name=_str_or_none(info.get("name")),
-                claude_session_id=_str_or_none(info.get("sessionId")),
+                claude_session_name=title,
+                claude_session_id=session_id,
             )
         )
     results.sort(key=lambda r: (r.session.name, r.session.pid, r.window or "", r.pid))
