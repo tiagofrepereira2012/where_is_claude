@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import re
 import subprocess
@@ -44,6 +45,8 @@ class ClaudeInScreen:
     args: str
     window: str | None = None
     cwd: str | None = None
+    claude_session_name: str | None = None
+    claude_session_id: str | None = None
 
     @property
     def attach_command(self) -> str:
@@ -63,6 +66,8 @@ class ClaudeInScreen:
             "claude_pid": self.pid,
             "claude_args": self.args,
             "cwd": self.cwd,
+            "claude_session_name": self.claude_session_name,
+            "claude_session_id": self.claude_session_id,
             "attach": self.attach_command,
         }
 
@@ -218,6 +223,30 @@ def _cwds_for(pids: list[int]) -> dict[int, str]:
     )
 
 
+def claude_config_dir() -> str:
+    """Return Claude Code's config directory, honouring CLAUDE_CONFIG_DIR."""
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+
+
+def read_claude_session_info(pid: int, config_dir: str | None = None) -> dict:
+    """Read the metadata Claude Code keeps for a running process.
+
+    Claude Code writes `<config>/sessions/<pid>.json` with the session id and,
+    when the session has one, its name. Returns an empty dict if it is missing.
+    """
+    path = os.path.join(config_dir or claude_config_dir(), "sessions", f"{pid}.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) and data.get("pid") in (None, pid) else {}
+
+
+def _str_or_none(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
 def find_claude_sessions() -> list[ClaudeInScreen]:
     """Return every Claude Code instance running inside a live screen session."""
     sessions = parse_screen_ls(_run(["screen", "-ls"]))
@@ -226,15 +255,19 @@ def find_claude_sessions() -> list[ClaudeInScreen]:
     processes = parse_ps(_run(["ps", "-axww", "-o", "pid=,ppid=,args="]))
     pairs = match_claude_to_sessions(sessions, processes)
     cwds = _cwds_for([proc.pid for _, proc in pairs])
-    results = [
-        ClaudeInScreen(
-            session=session,
-            pid=proc.pid,
-            args=proc.args,
-            window=_window_for(proc.pid),
-            cwd=cwds.get(proc.pid),
+    results = []
+    for session, proc in pairs:
+        info = read_claude_session_info(proc.pid)
+        results.append(
+            ClaudeInScreen(
+                session=session,
+                pid=proc.pid,
+                args=proc.args,
+                window=_window_for(proc.pid),
+                cwd=cwds.get(proc.pid) or _str_or_none(info.get("cwd")),
+                claude_session_name=_str_or_none(info.get("name")),
+                claude_session_id=_str_or_none(info.get("sessionId")),
+            )
         )
-        for session, proc in pairs
-    ]
     results.sort(key=lambda r: (r.session.name, r.session.pid, r.window or "", r.pid))
     return results

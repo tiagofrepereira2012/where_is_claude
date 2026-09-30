@@ -81,3 +81,20 @@ def test_attach_command():
         "screen -d -r 1.api -p 1"
     )
     assert ClaudeInScreen(session, 2, "claude").attach_command == "screen -d -r 1.api"
+
+
+def test_read_claude_session_info(tmp_path):
+    from where_is_claude.core import read_claude_session_info
+
+    sessions = tmp_path / "sessions"
+    sessions.mkdir()
+    (sessions / "4242.json").write_text(
+        '{"pid": 4242, "sessionId": "abc", "name": "Fix login bug", "cwd": "/x"}'
+    )
+    (sessions / "5000.json").write_text("not json")
+    (sessions / "6000.json").write_text('{"pid": 1234, "name": "stale"}')
+
+    assert read_claude_session_info(4242, str(tmp_path))["name"] == "Fix login bug"
+    assert read_claude_session_info(5000, str(tmp_path)) == {}
+    assert read_claude_session_info(6000, str(tmp_path)) == {}
+    assert read_claude_session_info(7000, str(tmp_path)) == {}

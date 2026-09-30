@@ -22,15 +22,15 @@ def _shorten_home(path: str | None) -> str:
 
 
 def _render_table(results: list[ClaudeInScreen]) -> str:
-    headers = ["SESSION", "STATE", "WINDOW", "PID", "DIRECTORY", "ATTACH WITH"]
+    headers = ["SESSION", "STATE", "WINDOW", "PID", "CLAUDE SESSION", "DIRECTORY"]
     rows = [
         [
             r.session.id,
             r.session.state,
             r.window if r.window is not None else "?",
             str(r.pid),
+            r.claude_session_name or "-",
             _shorten_home(r.cwd),
-            r.attach_command,
         ]
         for r in results
     ]

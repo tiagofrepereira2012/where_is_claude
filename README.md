@@ -5,12 +5,15 @@ which screen session, and which window inside it, each one lives in.
 
 ```console
 $ where-is-claude
-SESSION         STATE     WINDOW  PID    DIRECTORY                ATTACH WITH
-71234.api       Detached  0       71236  ~/code/api               screen -d -r 71234.api -p 0
-71300.frontend  Attached  2       71302  ~/code/frontend          screen -d -r 71300.frontend -p 2
+SESSION         STATE     WINDOW  PID    CLAUDE SESSION   DIRECTORY
+71234.api       Detached  0       71236  Fix login bug    ~/code/api
+71300.frontend  Attached  2       71302  -                ~/code/frontend
 ```
 
-Copy the command from the last column to jump straight to that Claude.
+Reattach with `screen -d -r <SESSION> -p <WINDOW>`.
+
+The Claude session name is the name Claude Code shows for that session.
+Unnamed sessions show `-`.
 
 ## Install
 
@@ -35,6 +38,8 @@ where-is-claude --version
    nearest screen ancestor.
 3. The screen window number comes from the process's `WINDOW` environment
    variable, and the directory comes from its working directory.
+4. The Claude session name comes from `~/.claude/sessions/<pid>.json`, which
+   Claude Code writes for each running instance. `CLAUDE_CONFIG_DIR` is honoured.
 
 It works on macOS and Linux, and has no dependencies beyond the Python standard
 library. The macOS Claude desktop app is not counted, only the Claude Code CLI.
